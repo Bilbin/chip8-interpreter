@@ -7,12 +7,12 @@ pub struct InstructionHandler {}
 impl InstructionHandler {
     pub fn execute(processor: &mut Processor, nibbles: [char; 4]) {
         match nibbles[0] {
-            '0' => processor.graphics.clear_screen(),
+            '0' => processor.clear_screen(),
             '1' => InstructionHandler::jump(processor, nibbles),
             '6' => InstructionHandler::set_register(processor, nibbles),
             '7' => InstructionHandler::add_immediate(processor, nibbles),
             'A' => InstructionHandler::set_index(processor, nibbles),
-            'D' => processor.graphics.draw_sprite(processor, nibbles),
+            'D' => processor.draw_sprite(nibbles),
             _ => panic!("Instruction not recognized: {:?}", nibbles),
         }
     }

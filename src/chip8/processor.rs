@@ -1,7 +1,27 @@
 use super::constants::*;
 use super::execution::*;
-use super::graphics::*;
-use pixels::Pixels;
+use super::loader::Loader;
+use super::utils::*;
+use pixels::wgpu::Color;
+use pixels::{Pixels, SurfaceTexture};
+use winit::dpi::LogicalSize;
+use winit::event_loop::EventLoop;
+use winit::window::WindowBuilder;
+use std::os::windows::process;
+use std::sync::*;
+
+const WINDOW_WIDTH: u32 = 1024;
+const WINDOW_HEIGHT: u32 = 512;
+const REAL_WIDTH: usize = 64;
+const REAL_HEIGHT: usize = 32;
+const BUFFER_CHUNK_SIZE: usize = 4;
+
+#[derive(PartialEq, Clone, Copy)]
+enum PixelState {
+    Off,
+    On,
+}
+use PixelState::*;
 
 #[allow(non_snake_case)]
 pub struct Processor {
@@ -15,7 +35,7 @@ pub struct Processor {
     pub sound_timer: u8,
     pub memory: [u8; 4096],
     pub stack: Vec<u16>,
-    pub graphics: Graphics,
+    pub pixels: Option<Pixels>,
 }
 
 impl Processor {
@@ -29,7 +49,7 @@ impl Processor {
             sound_timer: 0,
             memory: [0; 4096],
             stack: Vec::new(),
-            graphics: Graphics::new(),
+            pixels: None,
         };
 
         // Load font into memory
@@ -40,11 +60,40 @@ impl Processor {
         processor
     }
 
-    fn start(self) {
-        self.graphics.start();
+    pub fn start(&mut self) {
+        let event_loop = EventLoop::new();
+        let window_builder = WindowBuilder::new()
+            .with_title("Chip8 Interpreter")
+            .with_inner_size(LogicalSize::new(WINDOW_WIDTH, WINDOW_HEIGHT));
+        let window = window_builder.build(&event_loop).unwrap();
+        let size = window.inner_size();
+
+        let surface_texture = SurfaceTexture::new(WINDOW_WIDTH, WINDOW_HEIGHT, &window);
+        let mut pixels = Pixels::new(size.width, size.height, surface_texture).unwrap();
+        pixels
+            .resize_buffer(REAL_WIDTH as u32, REAL_HEIGHT as u32)
+            .unwrap();
+        pixels.clear_color(Color::BLACK);
+        pixels.render().unwrap();
+
+        self.pixels = Some(pixels);
+
+        event_loop.run(move |event, _, control_flow| {
+            *control_flow = winit::event_loop::ControlFlow::Wait;
+            self.execute();
+            
+            match event {
+                winit::event::Event::WindowEvent {
+                    event: winit::event::WindowEvent::CloseRequested,
+                    ..
+                } => *control_flow = winit::event_loop::ControlFlow::Exit,
+                _ => (),
+            }
+        });
     }
 
-    fn execute(&mut self) {
+
+    pub fn execute(&mut self) {
         let byte1 = self.memory[self.PC];
         let byte2 = self.memory[self.PC + 1];
         let nibbles = [byte1 >> 4, byte1 & 0b1111, byte2 >> 4, byte2 & 0b1111]
@@ -52,5 +101,76 @@ impl Processor {
 
         InstructionHandler::execute(self, nibbles);
         self.PC += 2;
+    }
+
+    pub fn draw_sprite(&mut self, nibbles: [char; 4]) {
+        let register_x = Utils::resolve_hex(&[nibbles[1]]);
+        let register_y = Utils::resolve_hex(&[nibbles[2]]);
+        let height = Utils::resolve_hex(&[nibbles[3]]);
+        let x = self.V_REGS[register_x as usize] % (REAL_WIDTH as u8);
+        let y = self.V_REGS[register_y as usize] % (REAL_HEIGHT as u8);
+        let base_address = self.I;
+
+        self.VF = 0;
+        for i in 0..height {
+            let sprite_byte = *self
+                .memory
+                .get((base_address + i) as usize)
+                .expect("Trying to access out-of-bounds memory");
+
+            for j in 0..8 {
+                let sprite_state = sprite_byte & (1 << j);
+                let pixel_state = self.get_pixel((x + j) as usize, (y + (i as u8)) as usize) as u8;
+                if sprite_state == 1 && pixel_state == 1 {
+                    self.VF = 1;
+                }
+                let final_state = if sprite_state ^ pixel_state == 1 { On } else { Off };
+                self.set_pixel((x + j) as usize, (y + (i as u8)) as usize, final_state);
+
+            }
+        }
+
+        self.pixels.as_mut().unwrap().render();
+    }
+
+
+
+
+    pub fn get_pixel(&self, x: usize, y: usize) -> PixelState {
+        let pixel = self
+            .pixels.as_ref().unwrap()
+            .frame()
+            .chunks_exact(BUFFER_CHUNK_SIZE)
+            .nth(y * REAL_WIDTH + x)
+            .unwrap();
+
+        if pixel[0] == 0xff {
+            On
+        } else {
+            Off
+        }
+    }
+
+    pub fn set_pixel(&mut self, x: usize, y: usize, state: PixelState) {
+        let pixel = self
+            .pixels.as_mut().unwrap()
+            .frame_mut()
+            .chunks_exact_mut(BUFFER_CHUNK_SIZE)
+            .nth(y * REAL_WIDTH + x)
+            .unwrap();
+        let color_state = state as u8;
+        pixel[0] = 0xff * color_state;
+        pixel[1] = 0xff * color_state;
+        pixel[2] = 0xff * color_state;
+        pixel[3] = 0xff;
+    }
+
+    pub fn clear_screen(&mut self) {
+        for pixel in self.pixels.as_mut().unwrap().frame_mut().chunks_exact_mut(BUFFER_CHUNK_SIZE) {
+            pixel[0] = 0x00;
+            pixel[1] = 0x00;
+            pixel[2] = 0x00;
+            pixel[3] = 0xff;
+        }
     }
 }
