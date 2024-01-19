@@ -31,7 +31,7 @@ impl InstructionHandler {
     fn add_immediate(processor: &mut Processor, nibbles: [char; 4]) {
         let register = Utils::resolve_hex(&[nibbles[1]]);
         let value = Utils::resolve_hex(&nibbles[2..4]);
-        processor.V_REGS[register as usize].wrapping_add(value as u8);
+        processor.V_REGS[register as usize] = processor.V_REGS[register as usize].wrapping_add(value as u8);
     }
 
     fn jump(processor: &mut Processor, nibbles: [char; 4]) {

@@ -9,7 +9,7 @@ use winit::event_loop::EventLoop;
 use winit::window::WindowBuilder;
 use std::os::windows::process;
 use std::sync::*;
-
+use std::time::Instant;
 const WINDOW_WIDTH: u32 = 1024;
 const WINDOW_HEIGHT: u32 = 512;
 const REAL_WIDTH: usize = 64;
@@ -24,6 +24,7 @@ enum PixelState {
 use PixelState::*;
 
 #[allow(non_snake_case)]
+#[derive(Debug)]
 pub struct Processor {
     pub PC: usize, // Program counter
     pub I: u16,    // Index register
@@ -36,6 +37,7 @@ pub struct Processor {
     pub memory: [u8; 4096],
     pub stack: Vec<u16>,
     pub pixels: Option<Pixels>,
+    pub last_execution: Instant,
 }
 
 impl Processor {
@@ -50,6 +52,7 @@ impl Processor {
             memory: [0; 4096],
             stack: Vec::new(),
             pixels: None,
+            last_execution: Instant::now(),
         };
 
         // Load font into memory
@@ -60,47 +63,18 @@ impl Processor {
         processor
     }
 
-    pub fn start(&mut self) {
-        let event_loop = EventLoop::new();
-        let window_builder = WindowBuilder::new()
-            .with_title("Chip8 Interpreter")
-            .with_inner_size(LogicalSize::new(WINDOW_WIDTH, WINDOW_HEIGHT));
-        let window = window_builder.build(&event_loop).unwrap();
-        let size = window.inner_size();
-
-        let surface_texture = SurfaceTexture::new(WINDOW_WIDTH, WINDOW_HEIGHT, &window);
-        let mut pixels = Pixels::new(size.width, size.height, surface_texture).unwrap();
-        pixels
-            .resize_buffer(REAL_WIDTH as u32, REAL_HEIGHT as u32)
-            .unwrap();
-        pixels.clear_color(Color::BLACK);
-        pixels.render().unwrap();
-
-        self.pixels = Some(pixels);
-
-        event_loop.run(move |event, _, control_flow| {
-            *control_flow = winit::event_loop::ControlFlow::Wait;
-            self.execute();
-            
-            match event {
-                winit::event::Event::WindowEvent {
-                    event: winit::event::WindowEvent::CloseRequested,
-                    ..
-                } => *control_flow = winit::event_loop::ControlFlow::Exit,
-                _ => (),
-            }
-        });
-    }
-
-
     pub fn execute(&mut self) {
         let byte1 = self.memory[self.PC];
         let byte2 = self.memory[self.PC + 1];
         let nibbles = [byte1 >> 4, byte1 & 0b1111, byte2 >> 4, byte2 & 0b1111]
             .map(|nibble| format!("{:X}", nibble).chars().next().unwrap());
-
+        
+        println!("Executing: {:?}", nibbles);
         InstructionHandler::execute(self, nibbles);
         self.PC += 2;
+        println!("PC: {:?}", self.PC);
+        println!("I: {:?}", self.I);
+        println!("V_REGS: {:?}\n", self.V_REGS);
     }
 
     pub fn draw_sprite(&mut self, nibbles: [char; 4]) {
@@ -172,5 +146,6 @@ impl Processor {
             pixel[2] = 0x00;
             pixel[3] = 0xff;
         }
+        self.pixels.as_mut().unwrap().render();
     }
 }
