@@ -41,7 +41,7 @@ fn main() {
     thread::spawn(move || {
         loop {
             // 700 instructions per second
-            if processor.last_execution.elapsed().as_millis() >= (1000 / 700) {
+            if processor.last_execution.elapsed().as_millis() >= 1000 {//(1000 / 700) {
                 processor.execute();
                 processor.last_execution = Instant::now();
             }

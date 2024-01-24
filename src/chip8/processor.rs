@@ -63,8 +63,8 @@ impl Processor {
         println!("Executing: {:?}", nibbles);
         InstructionHandler::execute(self, nibbles);
         
-        // Check that it wasn't a jump instruction
-        if nibbles[0] != '1' {
+        // Check that it wasn't a jump or subroutine return
+        if nibbles[0] != '1' && nibbles[0] != '2' {
             self.PC += 2;
         }
 
