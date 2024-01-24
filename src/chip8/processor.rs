@@ -1,23 +1,14 @@
 use super::constants::*;
 use super::execution::*;
-use super::loader::Loader;
 use super::utils::*;
-use pixels::wgpu::Color;
-use pixels::{Pixels, SurfaceTexture};
-use winit::dpi::LogicalSize;
-use winit::event_loop::EventLoop;
-use winit::window::WindowBuilder;
-use std::os::windows::process;
-use std::sync::*;
+use pixels::Pixels;
 use std::time::Instant;
-const WINDOW_WIDTH: u32 = 1024;
-const WINDOW_HEIGHT: u32 = 512;
 const REAL_WIDTH: usize = 64;
 const REAL_HEIGHT: usize = 32;
 const BUFFER_CHUNK_SIZE: usize = 4;
 
 #[derive(PartialEq, Clone, Copy)]
-enum PixelState {
+pub enum PixelState {
     Off,
     On,
 }
@@ -35,7 +26,7 @@ pub struct Processor {
     pub delay_timer: u8,
     pub sound_timer: u8,
     pub memory: [u8; 4096],
-    pub stack: Vec<u16>,
+    pub stack: Vec<[char; 3]>,
     pub pixels: Option<Pixels>,
     pub last_execution: Instant,
 }
@@ -71,7 +62,12 @@ impl Processor {
         
         println!("Executing: {:?}", nibbles);
         InstructionHandler::execute(self, nibbles);
-        self.PC += 2;
+        
+        // Check that it wasn't a jump instruction
+        if nibbles[0] != '1' {
+            self.PC += 2;
+        }
+
         println!("PC: {:?}", self.PC);
         println!("I: {:?}", self.I);
         println!("V_REGS: {:?}\n", self.V_REGS);
@@ -93,26 +89,32 @@ impl Processor {
                 .expect("Trying to access out-of-bounds memory");
 
             for j in 0..8 {
-                let sprite_state = sprite_byte & (1 << j);
+                let sprite_state = (sprite_byte & (128 >> j)) >> (7 - j);
                 let pixel_state = self.get_pixel((x + j) as usize, (y + (i as u8)) as usize) as u8;
                 if sprite_state == 1 && pixel_state == 1 {
                     self.VF = 1;
                 }
-                let final_state = if sprite_state ^ pixel_state == 1 { On } else { Off };
+                let final_state = if sprite_state ^ pixel_state == 1 {
+                    On
+                } else {
+                    Off
+                };
                 self.set_pixel((x + j) as usize, (y + (i as u8)) as usize, final_state);
-
             }
         }
 
-        self.pixels.as_mut().unwrap().render();
+        self.pixels
+            .as_mut()
+            .unwrap()
+            .render()
+            .expect("Failed to render pixel buffer on sprite draw");
     }
-
-
-
 
     pub fn get_pixel(&self, x: usize, y: usize) -> PixelState {
         let pixel = self
-            .pixels.as_ref().unwrap()
+            .pixels
+            .as_ref()
+            .unwrap()
             .frame()
             .chunks_exact(BUFFER_CHUNK_SIZE)
             .nth(y * REAL_WIDTH + x)
@@ -127,7 +129,9 @@ impl Processor {
 
     pub fn set_pixel(&mut self, x: usize, y: usize, state: PixelState) {
         let pixel = self
-            .pixels.as_mut().unwrap()
+            .pixels
+            .as_mut()
+            .unwrap()
             .frame_mut()
             .chunks_exact_mut(BUFFER_CHUNK_SIZE)
             .nth(y * REAL_WIDTH + x)
@@ -140,12 +144,24 @@ impl Processor {
     }
 
     pub fn clear_screen(&mut self) {
-        for pixel in self.pixels.as_mut().unwrap().frame_mut().chunks_exact_mut(BUFFER_CHUNK_SIZE) {
+        for pixel in self
+            .pixels
+            .as_mut()
+            .unwrap()
+            .frame_mut()
+            .chunks_exact_mut(BUFFER_CHUNK_SIZE)
+        {
             pixel[0] = 0x00;
             pixel[1] = 0x00;
             pixel[2] = 0x00;
             pixel[3] = 0xff;
         }
-        self.pixels.as_mut().unwrap().render();
+
+        self.pixels
+            .as_ref()
+            .unwrap()
+            .render()
+            .expect("Failed to render pixel buffer on screen clear");
+
     }
 }
