@@ -1,18 +1,15 @@
 use super::constants::*;
 use super::execution::*;
 use pixels::Pixels;
-use std::time::Instant;
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 #[allow(non_snake_case)]
 #[derive(Debug)]
 pub struct Processor {
     pub PC: usize, // Program counter
     pub I: u16,    // Index register
-    pub V_REGS: [u8; 15],
-
-    pub VF: u8, // Flag register
-
+    pub V_REGS: [u8; 16], // Last register is VF (Flag register)
     pub delay_timer: u8,
     pub sound_timer: u8,
     pub memory: [u8; 4096],
@@ -27,8 +24,7 @@ impl Processor {
         let mut processor = Self {
             PC: ROM_START,
             I: 0,
-            V_REGS: [0; 15],
-            VF: 0,
+            V_REGS: [0; 16],
             delay_timer: 0,
             sound_timer: 0,
             memory: [0; 4096],
@@ -51,17 +47,17 @@ impl Processor {
         let byte2 = self.memory[self.PC + 1];
         let nibbles = [byte1 >> 4, byte1 & 0b1111, byte2 >> 4, byte2 & 0b1111]
             .map(|nibble| format!("{:X}", nibble).chars().next().unwrap());
-        
+
         println!("Executing: {:?}", nibbles);
         InstructionHandler::execute(self, nibbles);
-        
+
         // Check that it wasn't a jump or subroutine return
         if nibbles[0] != '1' && nibbles[0] != '2' && nibbles[0] != 'B' {
             self.PC += 2;
         }
 
-        // println!("PC: {:?}", self.PC);
-        // println!("I: {:?}", self.I);
-        // println!("V_REGS: {:?}\n", self.V_REGS);
+        println!("PC: {:?}", self.PC);
+        println!("I: {:?}", self.I);
+        println!("V_REGS: {:?}\n", self.V_REGS);
     }
 }
