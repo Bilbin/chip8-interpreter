@@ -3,24 +3,52 @@ use pixels::wgpu::Color;
 use pixels::{Pixels, SurfaceTexture};
 use std::thread;
 use std::time::Instant;
-use winit::dpi::LogicalSize;
-use winit::event_loop::EventLoop;
-use winit::window::WindowBuilder;
+use winit_input_helper::WinitInputHelper;
+use winit::{
+    dpi::LogicalSize,
+    event_loop::EventLoop,
+    window::WindowBuilder,
+    event::{Event, WindowEvent},
+    keyboard::KeyCode,
+};
+use std::sync::{Arc, Mutex};
+
 mod chip8;
 
 const WINDOW_WIDTH: u32 = 1024;
 const WINDOW_HEIGHT: u32 = 512;
 const REAL_WIDTH: usize = 64;
 const REAL_HEIGHT: usize = 32;
+const KEY_BINDINGS: [KeyCode; 16] = [
+    KeyCode::Digit1,
+    KeyCode::Digit2,
+    KeyCode::Digit3,
+    KeyCode::Digit4,
+    KeyCode::KeyQ,
+    KeyCode::KeyW,
+    KeyCode::KeyE,
+    KeyCode::KeyR,
+    KeyCode::KeyA,
+    KeyCode::KeyS,
+    KeyCode::KeyD,
+    KeyCode::KeyF,
+    KeyCode::KeyZ,
+    KeyCode::KeyX,
+    KeyCode::KeyC,
+    KeyCode::KeyV,
+];
 
 fn main() {
-    let mut processor = Processor::new();
+    let pressed_keys = Arc::new(Mutex::new([false; 16]));
+    let shared_pressed_keys = Arc::clone(&pressed_keys);
+
+    let mut processor = Processor::new(pressed_keys);
     Loader::load_rom(&mut processor, "roms/IBM Logo.ch8");
     //processor.start();
     println!("{:?}", processor.memory);
 
     let size = LogicalSize::new(WINDOW_WIDTH, WINDOW_HEIGHT);
-    let event_loop = EventLoop::new();
+    let event_loop = EventLoop::new().unwrap();
     let window_builder = WindowBuilder::new()
         .with_title("Chip8 Interpreter")
         .with_inner_size(size)
@@ -41,22 +69,30 @@ fn main() {
     thread::spawn(move || {
         loop {
             // 700 instructions per second
-            if processor.last_execution.elapsed().as_millis() >= 1000 {//(1000 / 700) {
+            if processor.last_execution.elapsed().as_millis() >= (1000 / 1) {
                 processor.execute();
                 processor.last_execution = Instant::now();
             }
         }
     });
 
-    event_loop.run(move |event, _, control_flow| {
-        *control_flow = winit::event_loop::ControlFlow::Wait;
 
-        match event {
-            winit::event::Event::WindowEvent {
-                event: winit::event::WindowEvent::CloseRequested,
-                ..
-            } => *control_flow = winit::event_loop::ControlFlow::Exit,
-            _ => (),
+    let mut input = WinitInputHelper::new();
+
+    event_loop.run(move |event, elwt| {
+        if input.update(&event) {
+            for (ind, i) in KEY_BINDINGS.iter().enumerate() {
+                shared_pressed_keys.lock().unwrap()[ind] = input.key_held(*i);
+            }
         }
-    });
+        
+        if let Event::WindowEvent { event, .. } = event {
+            match event {
+                WindowEvent::CloseRequested => {
+                    elwt.exit();
+                }
+                _ => (),
+            }
+        }
+    }).unwrap();
 }
