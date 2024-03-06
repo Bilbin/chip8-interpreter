@@ -65,9 +65,7 @@ fn main() {
         rodio::OutputStream::try_default().expect("Unable to get audio output stream");
     let sink = Sink::try_new(&stream_handle).unwrap();
 
-    let wave = SquareWave::new(240.0, 44100)
-        .take_duration(Duration::from_secs_f32(0.25))
-        .amplify(0.1);
+    let wave = SquareWave::new(240.0, 44100);
     let source = wave
         .take_duration(Duration::from_secs_f32(0.25))
         .amplify(0.20)
