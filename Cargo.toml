@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+basic_waves = "0.1.1"
 pixels = "0.13.0"
 rand = "0.8.5"
+rodio = "0.17.3"
 winit = { version = "0.29", default-features = false, features = ["rwh_05", "x11", "wayland", "wayland-dlopen", "wayland-csd-adwaita"] }
 winit_input_helper = "0.15.3"

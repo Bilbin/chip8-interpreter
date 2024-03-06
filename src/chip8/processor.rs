@@ -7,8 +7,8 @@ use std::time::Instant;
 #[allow(non_snake_case)]
 #[derive(Debug)]
 pub struct Processor {
-    pub PC: usize, // Program counter
-    pub I: u16,    // Index register
+    pub PC: usize,        // Program counter
+    pub I: u16,           // Index register
     pub V_REGS: [u8; 16], // Last register is VF (Flag register)
     pub delay_timer: u8,
     pub sound_timer: u8,
@@ -35,8 +35,8 @@ impl Processor {
         };
 
         // Load font into memory
-        for i in 0..FONT.len() {
-            processor.memory[FONT_START + i] = FONT[i];
+        for (i, byte) in FONT.iter().enumerate() {
+            processor.memory[FONT_START + i] = *byte;
         }
 
         processor
@@ -48,16 +48,11 @@ impl Processor {
         let nibbles = [byte1 >> 4, byte1 & 0b1111, byte2 >> 4, byte2 & 0b1111]
             .map(|nibble| format!("{:X}", nibble).chars().next().unwrap());
 
-        println!("Executing: {:?}", nibbles);
         InstructionHandler::execute(self, nibbles);
 
         // Check that it wasn't a jump or subroutine return
         if nibbles[0] != '1' && nibbles[0] != '2' && nibbles[0] != 'B' {
             self.PC += 2;
         }
-
-        println!("PC: {:?}", self.PC);
-        println!("I: {:?}", self.I);
-        println!("V_REGS: {:?}\n", self.V_REGS);
     }
 }

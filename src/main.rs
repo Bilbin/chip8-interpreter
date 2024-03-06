@@ -1,9 +1,13 @@
-use chip8::{loader::Loader, processor::Processor};
-use pixels::wgpu::Color;
-use pixels::{Pixels, SurfaceTexture};
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::Instant;
+mod chip8;
+use chip8::{loader::Loader, processor::Processor, square::SquareWave};
+use pixels::{wgpu::Color, Pixels, SurfaceTexture};
+use rodio::{Sink, Source};
+use std::{
+    env,
+    sync::{Arc, Mutex},
+    thread,
+    time::{Duration, Instant},
+};
 use winit::{
     dpi::LogicalSize,
     event::{Event, WindowEvent},
@@ -12,8 +16,6 @@ use winit::{
     window::WindowBuilder,
 };
 use winit_input_helper::WinitInputHelper;
-
-mod chip8;
 
 const WINDOW_WIDTH: u32 = 1024;
 const WINDOW_HEIGHT: u32 = 512;
@@ -47,13 +49,34 @@ const KEY_BINDINGS: [KeyCode; 16] = [
 ];
 
 fn main() {
+    let args: Vec<String> = env::args().skip(1).collect();
+
+    if args.is_empty() {
+        println!("You must provide a rom as the first argument. Exiting...");
+        return;
+    }
+
+    let rom_path = &args[0];
+
     let pressed_keys = Arc::new(Mutex::new([false; 16]));
     let shared_pressed_keys = Arc::clone(&pressed_keys);
 
+    let (_stream, stream_handle) =
+        rodio::OutputStream::try_default().expect("Unable to get audio output stream");
+    let sink = Sink::try_new(&stream_handle).unwrap();
+
+    let wave = SquareWave::new(240.0, 44100)
+        .take_duration(Duration::from_secs_f32(0.25))
+        .amplify(0.1);
+    let source = wave
+        .take_duration(Duration::from_secs_f32(0.25))
+        .amplify(0.20)
+        .repeat_infinite();
+    sink.append(source);
+    sink.pause();
+
     let mut processor = Processor::new(pressed_keys);
-    Loader::load_rom(&mut processor, "roms/Cave.ch8");
-    //processor.start();
-    println!("{:?}", processor.memory);
+    Loader::load_rom(&mut processor, rom_path);
 
     let size = LogicalSize::new(WINDOW_WIDTH, WINDOW_HEIGHT);
     let event_loop = EventLoop::new().unwrap();
@@ -80,6 +103,12 @@ fn main() {
             if processor.last_execution.elapsed().as_millis() >= (1000 / 700) {
                 processor.execute();
                 processor.last_execution = Instant::now();
+            }
+
+            if processor.sound_timer > 0 {
+                sink.play();
+            } else {
+                sink.pause();
             }
 
             // Update timers 60 times a second
@@ -110,11 +139,8 @@ fn main() {
             }
 
             if let Event::WindowEvent { event, .. } = event {
-                match event {
-                    WindowEvent::CloseRequested => {
-                        elwt.exit();
-                    }
-                    _ => (),
+                if event == WindowEvent::CloseRequested {
+                    elwt.exit();
                 }
             }
         })

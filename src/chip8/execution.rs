@@ -24,8 +24,8 @@ impl InstructionHandler {
 
         match nibbles[0] {
             '0' => match &nibbles[1..] {
-                &['0', 'E', '0'] => InstructionHandler::clear_screen(processor),
-                &['0', 'E', 'E'] => InstructionHandler::sub_return(processor),
+                ['0', 'E', '0'] => InstructionHandler::clear_screen(processor),
+                ['0', 'E', 'E'] => InstructionHandler::sub_return(processor),
                 _ => panic!("Instruction not recognized: {:?}", nibbles),
             },
             '1' => InstructionHandler::jump(processor, nibbles),
@@ -53,20 +53,20 @@ impl InstructionHandler {
             'C' => InstructionHandler::random(processor, nibbles),
             'D' => InstructionHandler::draw_sprite(processor, nibbles),
             'E' => match &nibbles[2..] {
-                &['9', 'E'] => InstructionHandler::skip_if_pressed(processor, nibbles),
-                &['A', '1'] => InstructionHandler::skip_if_not_pressed(processor, nibbles),
+                ['9', 'E'] => InstructionHandler::skip_if_pressed(processor, nibbles),
+                ['A', '1'] => InstructionHandler::skip_if_not_pressed(processor, nibbles),
                 _ => panic!("Instruction not recognized: {:?}", nibbles),
             },
             'F' => match &nibbles[2..] {
-                &['0', '7'] => InstructionHandler::get_delay_timer(processor, nibbles),
-                &['1', '5'] => InstructionHandler::set_delay_timer(processor, nibbles),
-                &['1', '8'] => InstructionHandler::set_sound_timer(processor, nibbles),
-                &['1', 'E'] => InstructionHandler::add_to_index(processor, nibbles),
-                &['0', 'A'] => InstructionHandler::get_key(processor, nibbles),
-                &['2', '9'] => InstructionHandler::get_font_character(processor, nibbles),
-                &['3', '3'] => InstructionHandler::decimal_store(processor, nibbles),
-                &['5', '5'] => InstructionHandler::store_memory(processor, nibbles),
-                &['6', '5'] => InstructionHandler::load_memory(processor, nibbles),
+                ['0', '7'] => InstructionHandler::get_delay_timer(processor, nibbles),
+                ['1', '5'] => InstructionHandler::set_delay_timer(processor, nibbles),
+                ['1', '8'] => InstructionHandler::set_sound_timer(processor, nibbles),
+                ['1', 'E'] => InstructionHandler::add_to_index(processor, nibbles),
+                ['0', 'A'] => InstructionHandler::get_key(processor, nibbles),
+                ['2', '9'] => InstructionHandler::get_font_character(processor, nibbles),
+                ['3', '3'] => InstructionHandler::decimal_store(processor, nibbles),
+                ['5', '5'] => InstructionHandler::store_memory(processor, nibbles),
+                ['6', '5'] => InstructionHandler::load_memory(processor, nibbles),
                 _ => panic!("Instruction not recognized: {:?}", nibbles),
             },
             _ => panic!("Instruction not recognized: {:?}", nibbles),
@@ -77,7 +77,7 @@ impl InstructionHandler {
         let register_x = Utils::resolve_hex(&[nibbles[1]]);
 
         for i in 0..=register_x {
-            processor.V_REGS[i as usize] = processor.memory[(processor.I + i as u16) as usize];
+            processor.V_REGS[i as usize] = processor.memory[(processor.I + i) as usize];
         }
     }
 
@@ -85,7 +85,7 @@ impl InstructionHandler {
         let register_x = Utils::resolve_hex(&[nibbles[1]]);
 
         for i in 0..=register_x {
-            processor.memory[(processor.I + i as u16) as usize] = processor.V_REGS[i as usize];
+            processor.memory[(processor.I + i) as usize] = processor.V_REGS[i as usize];
         }
     }
 
@@ -97,7 +97,7 @@ impl InstructionHandler {
             .chars()
             .collect::<Vec<_>>()
             .into_boxed_slice();
-        address.copy_from_slice(&address_chars);
+        address.copy_from_slice(address_chars);
 
         processor.memory[processor.I as usize] = address[0].to_digit(10).unwrap() as u8;
         processor.memory[(processor.I + 1) as usize] = address[1].to_digit(10).unwrap() as u8;
@@ -255,7 +255,7 @@ impl InstructionHandler {
         } else {
             processor.V_REGS[0xF] = 0;
         }
-        processor.V_REGS[register_x as usize] = value_x.wrapping_add(value_y as u8);
+        processor.V_REGS[register_x as usize] = value_x.wrapping_add(value_y);
     }
 
     fn xor(processor: &mut Processor, nibbles: [char; 4]) {
@@ -331,7 +331,7 @@ impl InstructionHandler {
             .chars()
             .collect::<Vec<_>>()
             .into_boxed_slice();
-        address.copy_from_slice(&address_chars);
+        address.copy_from_slice(address_chars);
         processor.stack.push(address);
 
         let jump_address = Utils::resolve_hex(&nibbles[1..]);
@@ -426,7 +426,7 @@ impl InstructionHandler {
 
     pub fn get_pixel(processor: &mut Processor, x: usize, y: usize) -> Option<PixelState> {
         if x >= REAL_WIDTH || y >= REAL_HEIGHT {
-            println!("NOTE: Attempting to fetch pixel beyond screen.");
+            //println!("NOTE: Attempting to fetch pixel beyond screen.");
             return None;
         }
 
@@ -448,7 +448,7 @@ impl InstructionHandler {
 
     pub fn set_pixel(processor: &mut Processor, x: usize, y: usize, state: PixelState) {
         if x >= REAL_WIDTH || y >= REAL_HEIGHT {
-            println!("NOTE: Attempting to set pixel beyond screen.");
+            //println!("NOTE: Attempting to set pixel beyond screen.");
             return;
         }
 
